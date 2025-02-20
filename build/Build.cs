@@ -11,12 +11,9 @@ using Nuke.Common.Tooling;
 using Nuke.Common.Tools.DotNet;
 using Nuke.Common.Utilities.Collections;
 using static Nuke.Common.EnvironmentInfo;
-using static Nuke.Common.IO.FileSystemTasks;
 using static Nuke.Common.IO.PathConstruction;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
-[CheckBuildProjectConfigurations]
-[ShutdownDotNetAfterServerBuild]
 class Build : NukeBuild
 {
     /// Support plugins are available for:
@@ -55,8 +52,8 @@ class Build : NukeBuild
 		.Before(Restore)
 		.Executes(() =>
 		{
-			TestsDirectory.GlobDirectories("**/bin", "**/obj").ForEach(DeleteDirectory);
-			EnsureCleanDirectory(ArtifactsDirectory);
+			TestsDirectory.GlobDirectories("**/bin", "**/obj").ForEach(d => d.DeleteDirectory());
+            ArtifactsDirectory.CreateOrCleanDirectory();
 		});
 
 	Target Restore => _ => _
@@ -98,34 +95,33 @@ class Build : NukeBuild
 		.DependsOn(Test)
 		.Executes(() =>
 		{
-			// copy to artifacts folder
-			foreach (var file in Directory.GetFiles(RootDirectory, $"*.{PackageVersion}.nupkg", SearchOption.AllDirectories))
-			{
-				CopyFile(file, ArtifactsDirectory / Path.GetFileName(file), FileExistsPolicy.Overwrite);
-			}
+            // copy to artifacts folder
+            foreach (var file in Directory.GetFiles(RootDirectory, $"*.{PackageVersion}.nupkg", SearchOption.AllDirectories))
+            {
+                ((AbsolutePath) file).Copy(ArtifactsDirectory / Path.GetFileName(file), ExistsPolicy.FileOverwrite);
+            }
 
-			foreach (var file in Directory.GetFiles(RootDirectory, $"*.{PackageVersion}.snupkg", SearchOption.AllDirectories))
-			{
-				CopyFile(file, ArtifactsDirectory / Path.GetFileName(file), FileExistsPolicy.Overwrite);
-			}
-		});
+            foreach (var file in Directory.GetFiles(RootDirectory, $"*.{PackageVersion}.snupkg", SearchOption.AllDirectories))
+            {
+                ((AbsolutePath) file).Copy(ArtifactsDirectory / Path.GetFileName(file), ExistsPolicy.FileOverwrite);
+            }
+        });
 
 	Target Deploy => _ => _
 		.DependsOn(BuildAll)
 		.Executes(() =>
 		{
-			// copy to local store
-			foreach (var file in Directory.GetFiles(ArtifactsDirectory, $"*.{PackageVersion}.nupkg", SearchOption.AllDirectories))
-			{
-				CopyFile(file, DeployPath / Path.GetFileName(file), FileExistsPolicy.Overwrite);
-			}
+            // copy to local store
+            foreach (var file in Directory.GetFiles(ArtifactsDirectory, $"*.{PackageVersion}.nupkg", SearchOption.AllDirectories))
+            {
+                ((AbsolutePath) file).Copy(DeployPath / Path.GetFileName(file), ExistsPolicy.FileOverwrite);
+            }
 
-			foreach (var file in Directory.GetFiles(ArtifactsDirectory, $"*.{PackageVersion}.snupkg", SearchOption.AllDirectories))
-			{
-				CopyFile(file, DeployPath / Path.GetFileName(file), FileExistsPolicy.Overwrite);
-			}
-		}
-		);
+            foreach (var file in Directory.GetFiles(ArtifactsDirectory, $"*.{PackageVersion}.snupkg", SearchOption.AllDirectories))
+            {
+                ((AbsolutePath) file).Copy(DeployPath / Path.GetFileName(file), ExistsPolicy.FileOverwrite);
+            }
+        });
 
 	string PackageVersion
 		=> IsRc ? BuildNo < 10 ? $"{Version}-RC0{BuildNo}" : $"{Version}-RC{BuildNo}" : Version;
